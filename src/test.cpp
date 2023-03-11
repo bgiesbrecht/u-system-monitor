@@ -80,9 +80,12 @@ int main() {
 //   }
 //   cout << "Uptime: " << uptime << "\n";
 
-  auto u = LinuxParser::CpuUtilization();
-  for (string x : u) {
-    cout << x;
-  }
+  // auto u = LinuxParser::CpuUtilization();
+  // for (string x : u) {
+  //   cout << x;
+  // }
+
+  cout << LinuxParser::Uid(21102) << "\n";
+  cout << LinuxParser::User(21102) << "\n";
 
 }
