@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <cmath>
+#include <cstdlib> 
 #include <iostream>
 
 
@@ -133,7 +134,7 @@ float LinuxParser::MemoryUtilization() {
       }
     }
   }
-  return (memtotal - memfree) / memtotal * 1.0; 
+  return (float)(memtotal - memfree) / (float)memtotal; 
 }
 
 long LinuxParser::UpTime() { 
@@ -196,7 +197,7 @@ long LinuxParser::IdleJiffies() {
 float LinuxParser::CpuUtilization() {
   long active = ActiveJiffies();
   long idle = IdleJiffies();
-  return active * 100.0 / (active + idle);
+  return (float)active / (float)(active + idle);
 }
 
 
@@ -223,19 +224,19 @@ int LinuxParser::TotalProcesses() {
 int LinuxParser::RunningProcesses() { 
   string line;
   string key;
+  int procs_running = 0;
   std::ifstream stream(kProcDirectory + kStatFilename);
   if (stream.is_open()) {
     while (getline(stream, line)) {
       std::istringstream linestream(line);
       linestream >> key;
       if (key == "procs_running") {
-        int procs;
-        linestream >> procs;
-        return procs;
+        linestream >> procs_running;
+        return procs_running;
       }
     }
   }  
-  return 0;  
+  return procs_running;  
 }
 
 // Read and return the number of active jiffies for a PID
@@ -266,7 +267,7 @@ string LinuxParser::Ram(int pid) {
       linestream >> key;
       if (key == "VmSize:") {
         linestream >> kb;
-        return to_string(kb / 1024);
+        return to_string(round((float)kb/1024));
       }
     }
   }  
