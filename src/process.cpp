@@ -6,6 +6,7 @@
 
 #include "linux_parser.h"
 #include "process.h"
+#include "format.h"
 
 using std::string;
 using std::to_string;
@@ -18,7 +19,9 @@ Process::Process(int APid) { pid_ = APid; }
 int Process::Pid() { return pid_; }
 
 // Return this process's CPU utilization
-float Process::CpuUtilization() { return LinuxParser::ActiveJiffies(pid_); }
+float Process::CpuUtilization() const { 
+    return LinuxParser::CpuUtilization(pid_); 
+}
 
 // Return the command that generated this process
 string Process::Command() { return LinuxParser::Command(Process::pid_); }
@@ -32,6 +35,14 @@ string Process::User() { return LinuxParser::User(Process::pid_); }
 // Return the age of this process (in seconds)
 long int Process::UpTime() { return LinuxParser::UpTime(pid_); }
 
-// TODO: Overload the "less than" comparison operator for Process objects
-// REMOVE: [[maybe_unused]] once you define the function
-bool Process::operator<(Process const& a[[maybe_unused]]) const { return true; }
+// Overload the "less than" comparison operator for Process objects
+bool Process::operator<(Process const& a) const { 
+    return CpuUtilization() < a.CpuUtilization();
+    // return pid_ > a.pid_;
+}
+
+// Overload the "greater than" comparison operator for Process objects
+bool Process::operator>(Process const& a) const { 
+    return CpuUtilization() > a.CpuUtilization();
+    // return pid_ > a.pid_;
+}

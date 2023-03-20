@@ -22,10 +22,13 @@ You need to properly format the uptime. Refer to the comments mentioned in forma
 Processor& System::Cpu() { return cpu_; }
 
 // TODO: Return a container composed of the system's processes
-vector<Process>& System::Processes() { 
+vector<Process>& System::Processes() {
+    processes_.clear(); 
     for (int pid : Pids()) {
         processes_.push_back(Process(pid));
     }
+    sort(processes_.begin(), processes_.end(), std::greater<Process>());  //  
+    // processes_.sort();
     return processes_; 
 }
 

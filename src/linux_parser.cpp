@@ -8,9 +8,10 @@
 #include <cmath>
 #include <cstdlib> 
 #include <iostream>
-
+#include <iomanip> 
 
 #include "linux_parser.h"
+#include "format.h"
 
 using std::stof;
 using std::string;
@@ -20,42 +21,7 @@ using std::unordered_map;
 using std::unordered_set;
 using std::ostringstream;
 using std::getline;
-
-template <typename T> unordered_map<string, T> GetTabularValues(string source, unordered_set<string> keys) {
-  unordered_map<string, T> values;
-  int keys_remaining = keys.size();
-  std::ifstream filestream(source);
-  string line, key;
-  T value;
-  if (filestream.is_open()) {
-    while (keys_remaining && getline(filestream, line)) {
-      std::istringstream linestream(line);
-      linestream >> key >> value;
-      if (keys.find(key) != keys.end()) {
-        values[key] = value;
-        keys_remaining--;
-      }
-    }
-  }
-  return values;
-}
-
-template <typename T> vector<T> getSerialValues(string source) {
-  vector<T> values{};
-  std::ifstream filestream(source);
-  string token;
-  T value;
-  if (filestream.is_open()) {
-    while (getline(filestream, token, ' ')) {
-      if (token.size()) {
-        std::istringstream tokenstream(token);
-        tokenstream >> value;
-        values.push_back(value);
-      }
-    }
-  }
-  return values;  
-}
+using LinuxParser::CPUStates;
 
 string LinuxParser::OperatingSystem() {
   string line;
@@ -194,10 +160,44 @@ long LinuxParser::IdleJiffies() {
 }
 
 // Read and return CPU utilization
-float LinuxParser::CpuUtilization() {
-  long active = ActiveJiffies();
-  long idle = IdleJiffies();
-  return (float)active / (float)(active + idle);
+float LinuxParser::CpuUtilization(std::vector<long> &prev) {
+
+  // Read cpu vals into a vector
+  std::vector<long> vals;
+  string line;
+  string key;
+  std::ifstream stream(kProcDirectory + kStatFilename);
+  if (stream.is_open()) {
+    while (getline(stream, line)) {
+      std::istringstream linestream(line);
+      linestream >> key;
+      long val;
+      if (key == "cpu") {
+        for (int i = 0; i < 10; i++) {
+          linestream >> val;
+          vals.push_back(val);
+        }
+        break;
+      }
+    }
+  }  
+
+  // This algorithm was taken from https://stackoverflow.com/a/23376195
+  long prevIdle = prev[CPUStates::kIdle_] + prev[CPUStates::kIOwait_];
+  long idle = vals[CPUStates::kIdle_] + vals[CPUStates::kIOwait_];
+
+  long prevNonIdle = prev[CPUStates::kUser_] + prev[CPUStates::kNice_] + prev[CPUStates::kSystem_] + prev[CPUStates::kIRQ_] + prev[CPUStates::kSoftIRQ_] + prev[CPUStates::kSteal_];
+  long nonIdle = vals[CPUStates::kUser_] + vals[CPUStates::kNice_] + vals[CPUStates::kSystem_] + vals[CPUStates::kIRQ_] + vals[CPUStates::kSoftIRQ_] + vals[CPUStates::kSteal_];
+
+  prev = vals;
+
+  long prevTotal = prevIdle + prevNonIdle;
+  long total = idle + nonIdle;
+
+  long totalDiff = total - prevTotal;
+  long idleDiff = idle - prevIdle;
+
+  return (float)(totalDiff - idleDiff) / (float)totalDiff;
 }
 
 
@@ -241,7 +241,8 @@ int LinuxParser::RunningProcesses() {
 
 // Read and return the number of active jiffies for a PID
 long LinuxParser::ActiveJiffies(int pid) {
-  return GetActiveJiffies(kProcDirectory + to_string(pid) + kStatFilename);
+  auto j = GetActiveJiffies(kProcDirectory + to_string(pid) + kStatFilename);
+  return j;
 }
 
 // Read and return the command associated with a process
@@ -252,7 +253,7 @@ string LinuxParser::Command(int pid) {
     getline(stream, cmd);
     return cmd;
   }  
-  return string("unknown");
+  return "unknown";
 }
 
 // Read and return the memory used by a process
@@ -267,11 +268,14 @@ string LinuxParser::Ram(int pid) {
       linestream >> key;
       if (key == "VmSize:") {
         linestream >> kb;
-        return to_string(round((float)kb/1024));
+        float mb = (float)kb/1024;
+        std::stringstream ss;
+        ss << std::fixed << std::setprecision(2) << mb;
+        return ss.str();
       }
     }
   }  
-  return string("unknown");
+  return "unknown";
 }
 
 // Read and return the user ID associated with a process
@@ -289,7 +293,7 @@ string LinuxParser::Uid(int pid) {
       }
     }
   }  
-  return string("unknown");
+  return "unknown";
 }
 
 string LinuxParser::User(int pid) { 
@@ -311,24 +315,60 @@ string LinuxParser::User(int pid) {
       }
     }
   }  
-  return string("unknown");
+  return "unknown";
 }
 
 // Read and return the uptime of a process
 long LinuxParser::UpTime(int pid) {
-  std::ifstream stream(kProcDirectory + to_string(pid) + kStatFilename);
+  string toOpen = kProcDirectory + to_string(pid) + kStatFilename;
+  std::ifstream stream(toOpen);
   if (stream.is_open()) {
     string val;
     string line;
-    while (getline(stream, line)) {
-      std::istringstream linestream(line);
-      for (int i = 0; i < 21; i++) {
-        linestream >> val;
-      }
-      long lVal;
-      linestream >> lVal;
-      return lVal / sysconf(_SC_CLK_TCK);
+    long starttime;
+    std::vector<string> statVals;
+    getline(stream, line);
+    std::istringstream linestream(line);
+    for (int i = 0; i < 21; i++) {
+      linestream >> val;
     }
+    linestream >> starttime;
+
+    // long seconds = LinuxParser::UpTime() - (starttime / sysconf(_SC_CLK_TCK));
+    long seconds = starttime / sysconf(_SC_CLK_TCK);
+    return seconds;
   }
+  return 0;
+}
+
+// Read and return the uptime of a process
+float LinuxParser::CpuUtilization(int pid) {
+  string toOpen = kProcDirectory + to_string(pid) + kStatFilename;
+  std::ifstream stream(toOpen);
+  if (stream.is_open()) {
+    string val;
+    string line;
+    std::vector<string> statVals;
+    getline(stream, line);
+    std::istringstream linestream(line);
+    for (int i = 0; i < 22; i++) {
+      linestream >> val;
+      statVals.push_back(val);
+    }
+
+    // Algorithm taken from https://stackoverflow.com/a/16736599
+    long utime = atol(statVals[13].c_str());
+    long stime = atol(statVals[14].c_str());
+    long cutime = atol(statVals[14].c_str());
+    long cstime = atol(statVals[16].c_str());
+    long starttime = atol(statVals[21].c_str());
+
+    long total_time = utime + stime + cutime + cstime;
+    long seconds = LinuxParser::UpTime() - (starttime / sysconf(_SC_CLK_TCK));
+    float cpu_usage = ((float)total_time / sysconf(_SC_CLK_TCK)) / (float)seconds;
+
+    return cpu_usage;
+  }
+
   return 0;
 }
