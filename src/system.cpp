@@ -22,9 +22,9 @@ Processor& System::Cpu() { return cpu_; }
 vector<Process>& System::Processes() {
     processes_.clear(); 
     for (int pid : Pids()) {
-        processes_.push_back(Process(pid));
+        processes_.emplace_back(pid);
     }
-    sort(processes_.begin(), processes_.end(), std::greater<Process>());  //  
+    sort(processes_.begin(), processes_.end(), std::greater<Process>());
     return processes_; 
 }
 

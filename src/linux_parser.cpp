@@ -266,11 +266,11 @@ string LinuxParser::Ram(int pid) {
     while (getline(stream, line)) {
       std::istringstream linestream(line);
       linestream >> key;
-      if (key == "VmSize:") {
+      if (key == "VmRSS:") {
         linestream >> kb;
         float mb = (float)kb/1024;
         std::stringstream ss;
-        ss << std::fixed << std::setprecision(2) << mb;
+        ss << std::fixed << std::setprecision(0) << mb;
         return ss.str();
       }
     }
@@ -334,8 +334,8 @@ long LinuxParser::UpTime(int pid) {
     }
     linestream >> starttime;
 
-    // long seconds = LinuxParser::UpTime() - (starttime / sysconf(_SC_CLK_TCK));
-    long seconds = starttime / sysconf(_SC_CLK_TCK);
+    long seconds = LinuxParser::UpTime() - (starttime / sysconf(_SC_CLK_TCK));
+    // long seconds = starttime / sysconf(_SC_CLK_TCK);
     return seconds;
   }
   return 0;
