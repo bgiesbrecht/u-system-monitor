@@ -266,6 +266,7 @@ string LinuxParser::Ram(int pid) {
     while (getline(stream, line)) {
       std::istringstream linestream(line);
       linestream >> key;
+      // NOTE:Using VmRSS in lieu of VmSize
       if (key == "VmRSS:") {
         linestream >> kb;
         float mb = (float)kb/1024;
